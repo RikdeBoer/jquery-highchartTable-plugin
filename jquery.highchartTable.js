@@ -79,8 +79,13 @@
       var ths            = $('thead th', table);
       var columns        = [];
       var vlines         = [];
-      var skippedColumns = 0;
+      //var skippedColumns = 0;
       var graphIsStacked = false;
+
+      // RdB allow xaxis column to be nominated as a number, starting at 0.
+      var xIndexTh = $table.data('graph-xaxis') || 0;
+      var indexSeries = 0;
+
       ths.each(function(indexTh, th) {
         var $th = $(th);
         var columnScale = $th.data('graph-value-scale');
@@ -107,15 +112,15 @@
         }
 
         var isColumnSkipped = $th.data('graph-skip') == 1;
-        if (isColumnSkipped)
-        {
-          skippedColumns = skippedColumns + 1;
-        }
+        //if (isColumnSkipped)
+        //{
+        //  skippedColumns = skippedColumns + 1;
+        //}
 
         var thGraphConfig = {
           libelle:           $th.text(),
           skip:              isColumnSkipped,
-          indexTd:           indexTh - skippedColumns - 1,
+          indexTd:           isColumnSkipped || indexTh === xIndexTh ? -1 : indexSeries++, // RdB
           color:             $th.data('graph-color'),
           visible:           !$th.data('graph-hidden'),
           yAxis:             typeof yaxis != 'undefined' ? yaxis : 0,
@@ -142,7 +147,7 @@
       
       var series = [];
       $(columns).each(function(indexColumn, column) {
-        if(indexColumn!=0 && !column.skip) {
+        if(indexColumn!==xIndexTh && !column.skip) {  // RdB
 
           var serieConfig = {
             name:      column.libelle + (column.unit ? ' (' + column.unit + ')' : ''),
@@ -209,7 +214,7 @@
             return;
           }
           var $td = $(td);
-          if (indexTd==0) {
+          if (indexTd==xIndexTh) { // RdB
             cellValue = $td.text();
             xValues.push(cellValue);
           } else {
@@ -264,6 +269,25 @@
         });
 
       });
+
+      // RdB remove series that have invalid data cells.
+      if ($table.data('graph-suppress-invalid-series') == 1) {
+        for (var seriesIndex = 0; seriesIndex < series.length;) {
+          var isValid = true;
+          var data = series[seriesIndex].data;
+          for (var d = 0; d < data.length; d++) {
+            if (data[d] == null || isNaN(data[d].y)) {
+              // Invalid data cell, remove serie.
+              isValid = false;
+              series.splice(seriesIndex, 1);
+              break;
+            }
+          }
+          if (isValid) {
+            seriesIndex++;
+          }
+        }
+      }
 
       var yAxisConfig = [];
       var yAxisNum;
